@@ -132,11 +132,13 @@ require('lazy').setup({
   {
     -- Theme inspired by Atom
 --    'navarasu/onedark.nvim',
-    'folke/tokyonight.nvim',
+--    'folke/tokyonight.nvim',
+    'catppuccin/nvim', name = 'catppuccin',
     priority = 1000,
     config = function()
 --      vim.cmd.colorscheme 'onedark'
-      vim.cmd.colorscheme 'tokyonight'
+--      vim.cmd.colorscheme 'tokyonight'
+      vim.cmd.colorscheme 'catppuccin'
     end,
   },
 
