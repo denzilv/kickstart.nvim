@@ -161,10 +161,9 @@ require('lazy').setup({
     'lukas-reineke/indent-blankline.nvim',
     -- Enable `lukas-reineke/indent-blankline.nvim`
     -- See `:help indent_blankline.txt`
-    opts = {
-      char = '┊',
-      show_trailing_blankline_indent = false,
-    },
+    -- https://github.com/lukas-reineke/indent-blankline.nvim/wiki/Migrate-to-version-3
+    main = "ibl",
+    opts = {},
   },
 
   -- "gc" to comment visual regions/lines
