@@ -309,7 +309,7 @@ vim.keymap.set('n', '<leader>sd', require('telescope.builtin').diagnostics, { de
 -- See `:help nvim-treesitter`
 require('nvim-treesitter.configs').setup {
   -- Add languages to be installed here that you want installed for treesitter
-  ensure_installed = { 'c', 'cpp', 'go', 'hcl', 'lua', 'python', 'rust', 'terraform', 'tsx', 'typescript', 'vim', 'vimdoc' },
+  ensure_installed = { 'c', 'cpp', 'go', 'hcl', 'lua', 'nginx', 'python', 'rust', 'terraform', 'tsx', 'typescript', 'vim', 'vimdoc', 'yaml' },
 
   -- Autoinstall languages that are not installed. Defaults to false (but you can change for yourself!)
   auto_install = true,
@@ -446,24 +446,23 @@ local servers = {
 require('neodev').setup()
 
 -- nvim-cmp supports additional completion capabilities, so broadcast that to servers
-local capabilities = vim.lsp.protocol.make_client_capabilities()
-capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
+local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
--- Ensure the servers above are installed
-local mason_lspconfig = require 'mason-lspconfig'
+-- mason-lspconfig v2+ uses Neovim's native vim.lsp.config / vim.lsp.enable APIs
+vim.lsp.config('*', {
+  capabilities = capabilities,
+  on_attach = on_attach,
+})
 
-mason_lspconfig.setup {
+for server_name, settings in pairs(servers) do
+  vim.lsp.config(server_name, {
+    settings = settings,
+  })
+end
+
+-- Ensure the servers above are installed (and auto-enabled when installed)
+require('mason-lspconfig').setup {
   ensure_installed = vim.tbl_keys(servers),
-}
-
-mason_lspconfig.setup_handlers {
-  function(server_name)
-    require('lspconfig')[server_name].setup {
-      capabilities = capabilities,
-      on_attach = on_attach,
-      settings = servers[server_name],
-    }
-  end,
 }
 
 -- [[ Configure nvim-cmp ]]
