@@ -260,6 +260,37 @@ vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
 vim.keymap.set('n', 'k', "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
 vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
 
+-- Window navigation (works from normal mode and from a terminal window).
+-- The terminal-mode maps first drop out of Terminal mode (<C-\><C-n>) then jump,
+-- so switching focus to/from Claude in a :terminal split is a single keystroke.
+vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Move to left window' })
+vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Move to lower window' })
+vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Move to upper window' })
+vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Move to right window' })
+
+vim.keymap.set('t', '<C-h>', [[<C-\><C-n><C-w>h]], { desc = 'Terminal: move to left window' })
+vim.keymap.set('t', '<C-j>', [[<C-\><C-n><C-w>j]], { desc = 'Terminal: move to lower window' })
+vim.keymap.set('t', '<C-k>', [[<C-\><C-n><C-w>k]], { desc = 'Terminal: move to upper window' })
+vim.keymap.set('t', '<C-l>', [[<C-\><C-n><C-w>l]], { desc = 'Terminal: move to right window' })
+
+-- netrw installs buffer-local <C-h> (edit hiding list) and <C-l> (refresh)
+-- mappings that shadow the global window-nav maps above. Re-assert our maps as
+-- buffer-local whenever a netrw buffer opens so window navigation works there too.
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'netrw',
+  group = vim.api.nvim_create_augroup('NetrwWindowNav', { clear = true }),
+  callback = function()
+    local opts = { buffer = 0, remap = false, silent = true }
+    vim.keymap.set('n', '<C-h>', '<C-w>h', opts)
+    vim.keymap.set('n', '<C-j>', '<C-w>j', opts)
+    vim.keymap.set('n', '<C-k>', '<C-w>k', opts)
+    vim.keymap.set('n', '<C-l>', '<C-w>l', opts)
+  end,
+})
+
+-- Quick escape from Terminal mode to Normal mode without leaving the window
+vim.keymap.set('t', '<Esc><Esc>', [[<C-\><C-n>]], { desc = 'Terminal: exit to Normal mode' })
+
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
 local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
