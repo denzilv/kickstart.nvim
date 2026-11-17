@@ -353,7 +353,7 @@ local function ts_attach(buf, lang)
   vim.treesitter.start(buf, lang) -- highlighting
   -- Indent, except python (disabled in the old config too)
   if lang ~= 'python' and vim.treesitter.query.get(lang, 'indents') then
-    vin.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+    vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
   end
 end
 
@@ -372,7 +372,7 @@ vim.api.nvim_create_autocmd('FileType', {
     end
   end,
 })
-        
+
 -- [[ Configure Treesitter textobjects ]]
 require('nvim-treesitter-textobjects').setup {
   select = { lookahead = true },
@@ -394,8 +394,8 @@ for keys, m in pairs {
   [']]'] = { 'goto_next_start', '@class.outer' },
   [']M'] = { 'goto_next_end', '@function.outer' },
   [']['] = { 'goto_next_end', '@class.outer' },
-  ['[m'] = { 'goto_prevoius_start', '@function.outer' },
-  ['[['] = { 'goto_previou_start', '@class.outer' },
+  ['[m'] = { 'goto_previous_start', '@function.outer' },
+  ['[['] = { 'goto_previous_start', '@class.outer' },
   ['[M'] = { 'goto_previous_end', '@function.outer' },
   ['[]'] = { 'goto_previous_end', '@class.outer' },
 } do
