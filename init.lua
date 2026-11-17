@@ -260,6 +260,37 @@ vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
 vim.keymap.set('n', 'k', "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
 vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
 
+-- Window navigation (works from normal mode and from a terminal window).
+-- The terminal-mode maps first drop out of Terminal mode (<C-\><C-n>) then jump,
+-- so switching focus to/from Claude in a :terminal split is a single keystroke.
+vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Move to left window' })
+vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Move to lower window' })
+vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Move to upper window' })
+vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Move to right window' })
+
+vim.keymap.set('t', '<C-h>', [[<C-\><C-n><C-w>h]], { desc = 'Terminal: move to left window' })
+vim.keymap.set('t', '<C-j>', [[<C-\><C-n><C-w>j]], { desc = 'Terminal: move to lower window' })
+vim.keymap.set('t', '<C-k>', [[<C-\><C-n><C-w>k]], { desc = 'Terminal: move to upper window' })
+vim.keymap.set('t', '<C-l>', [[<C-\><C-n><C-w>l]], { desc = 'Terminal: move to right window' })
+
+-- netrw installs buffer-local <C-h> (edit hiding list) and <C-l> (refresh)
+-- mappings that shadow the global window-nav maps above. Re-assert our maps as
+-- buffer-local whenever a netrw buffer opens so window navigation works there too.
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'netrw',
+  group = vim.api.nvim_create_augroup('NetrwWindowNav', { clear = true }),
+  callback = function()
+    local opts = { buffer = 0, remap = false, silent = true }
+    vim.keymap.set('n', '<C-h>', '<C-w>h', opts)
+    vim.keymap.set('n', '<C-j>', '<C-w>j', opts)
+    vim.keymap.set('n', '<C-k>', '<C-w>k', opts)
+    vim.keymap.set('n', '<C-l>', '<C-w>l', opts)
+  end,
+})
+
+-- Quick escape from Terminal mode to Normal mode without leaving the window
+vim.keymap.set('t', '<Esc><Esc>', [[<C-\><C-n>]], { desc = 'Terminal: exit to Normal mode' })
+
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
 local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
@@ -309,7 +340,7 @@ vim.keymap.set('n', '<leader>sd', require('telescope.builtin').diagnostics, { de
 -- See `:help nvim-treesitter`
 require('nvim-treesitter.configs').setup {
   -- Add languages to be installed here that you want installed for treesitter
-  ensure_installed = { 'c', 'cpp', 'go', 'hcl', 'lua', 'python', 'rust', 'terraform', 'tsx', 'typescript', 'vim', 'vimdoc' },
+  ensure_installed = { 'c', 'cpp', 'go', 'hcl', 'lua', 'nginx', 'python', 'rust', 'terraform', 'tsx', 'typescript', 'vim', 'vimdoc', 'yaml' },
 
   -- Autoinstall languages that are not installed. Defaults to false (but you can change for yourself!)
   auto_install = true,
@@ -446,24 +477,23 @@ local servers = {
 require('neodev').setup()
 
 -- nvim-cmp supports additional completion capabilities, so broadcast that to servers
-local capabilities = vim.lsp.protocol.make_client_capabilities()
-capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
+local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
--- Ensure the servers above are installed
-local mason_lspconfig = require 'mason-lspconfig'
+-- mason-lspconfig v2+ uses Neovim's native vim.lsp.config / vim.lsp.enable APIs
+vim.lsp.config('*', {
+  capabilities = capabilities,
+  on_attach = on_attach,
+})
 
-mason_lspconfig.setup {
+for server_name, settings in pairs(servers) do
+  vim.lsp.config(server_name, {
+    settings = settings,
+  })
+end
+
+-- Ensure the servers above are installed (and auto-enabled when installed)
+require('mason-lspconfig').setup {
   ensure_installed = vim.tbl_keys(servers),
-}
-
-mason_lspconfig.setup_handlers {
-  function(server_name)
-    require('lspconfig')[server_name].setup {
-      capabilities = capabilities,
-      on_attach = on_attach,
-      settings = servers[server_name],
-    }
-  end,
 }
 
 -- [[ Configure nvim-cmp ]]
