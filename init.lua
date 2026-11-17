@@ -188,10 +188,17 @@ require('lazy').setup({
   {
     -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
-    dependencies = {
-      'nvim-treesitter/nvim-treesitter-textobjects',
-    },
+    branch = 'main',
+    lazy = false, -- the main branch doesn't support lazy-loading
     build = ':TSUpdate',
+  },
+  {
+    'nvim-treesitter/nvim-treesitter-textobjects',
+    branch = 'main',
+    init = function()
+      -- Built-in ftplugins (python, rust, ...) define buffer-local ]m/[m maps that would override ours
+      vim.g.no_plugin_maps = true
+    end,
   },
 
   -- NOTE: Next Step on Your Neovim Journey: Add/Configure additional "plugins" for kickstart
@@ -337,70 +344,68 @@ vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, { desc
 vim.keymap.set('n', '<leader>sd', require('telescope.builtin').diagnostics, { desc = '[S]earch [D]iagnostics' })
 
 -- [[ Configure Treesitter ]]
--- See `:help nvim-treesitter`
-require('nvim-treesitter.configs').setup {
-  -- Add languages to be installed here that you want installed for treesitter
-  ensure_installed = { 'c', 'cpp', 'go', 'hcl', 'lua', 'nginx', 'python', 'rust', 'terraform', 'tsx', 'typescript', 'vim', 'vimdoc', 'yaml' },
+-- See `:help nvim-treesitter-intro`
+local ts = require 'nvim-treesitter'
+ts.install { 'c', 'cpp', 'go', 'hcl', 'lua', 'nginx', 'python', 'rust', 'terraform', 'tsx', 'typescript', 'vim', 'vimdoc', 'yaml' }
 
-  -- Autoinstall languages that are not installed. Defaults to false (but you can change for yourself!)
-  auto_install = true,
+local function ts_attach(buf, lang)
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.treesitter.language.add(lang) then return end
+  vim.treesitter.start(buf, lang) -- highlighting
+  -- Indent, except python (disabled in the old config too)
+  if lang ~= 'python' and vim.treesitter.query.get(lang, 'indents') then
+    vin.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+  end
+end
 
-  highlight = { enable = true },
-  indent = { enable = true, disable = { 'python' } },
-  incremental_selection = {
-    enable = true,
-    keymaps = {
-      init_selection = '<c-space>',
-      node_incremental = '<c-space>',
-      scope_incremental = '<c-s>',
-      node_decremental = '<M-space>',
-    },
-  },
-  textobjects = {
-    select = {
-      enable = true,
-      lookahead = true, -- Automatically jump forward to textobj, similar to targets.vim
-      keymaps = {
-        -- You can use the capture groups defined in textobjects.scm
-        ['aa'] = '@parameter.outer',
-        ['ia'] = '@parameter.inner',
-        ['af'] = '@function.outer',
-        ['if'] = '@function.inner',
-        ['ac'] = '@class.outer',
-        ['ic'] = '@class.inner',
-      },
-    },
-    move = {
-      enable = true,
-      set_jumps = true, -- whether to set jumps in the jumplist
-      goto_next_start = {
-        [']m'] = '@function.outer',
-        [']]'] = '@class.outer',
-      },
-      goto_next_end = {
-        [']M'] = '@function.outer',
-        [']['] = '@class.outer',
-      },
-      goto_previous_start = {
-        ['[m'] = '@function.outer',
-        ['[['] = '@class.outer',
-      },
-      goto_previous_end = {
-        ['[M'] = '@function.outer',
-        ['[]'] = '@class.outer',
-      },
-    },
-    swap = {
-      enable = true,
-      swap_next = {
-        ['<leader>a'] = '@parameter.inner',
-      },
-      swap_previous = {
-        ['<leader>A'] = '@parameter.inner',
-      },
-    },
-  },
+local available = ts.get_available()
+vim.api.nvim_create_autocmd('FileType', {
+  callback = function(args)
+    local lang = vim.treesitter.language.get_lang(args.match)
+    if not lang then return end
+    if vim.tbl_contains(ts.get_installed 'parsers', lang) then
+      ts_attach(args.buf, lang)
+    elseif vim.tbl_contains(available, lang) then
+      -- Replaces the old auto_install = true
+      ts.install(lang):await(function() ts_attach(args.buf, lang) end)
+    else
+      ts_attach(args.buf, lang)
+    end
+  end,
+})
+        
+-- [[ Configure Treesitter textobjects ]]
+require('nvim-treesitter-textobjects').setup {
+  select = { lookahead = true },
+  move = { set_jumps = true },
 }
+
+local select = require 'nvim-treesitter-textobjects.select'
+for keys, query in pairs {
+  aa = '@parameter.outer', ia = '@parameter.inner',
+  af = '@function.outer', ['if'] = '@function.inner',
+  ac = '@class.outer', ic = '@class.inner',
+} do
+  vim.keymap.set({ 'x', 'o' }, keys, function() select.select_textobject(query, 'textobjects') end, { desc = 'TS select ' .. query })
+end
+
+local move = require 'nvim-treesitter-textobjects.move'
+for keys, m in pairs {
+  [']m'] = { 'goto_next_start', '@function.outer' },
+  [']]'] = { 'goto_next_start', '@class.outer' },
+  [']M'] = { 'goto_next_end', '@function.outer' },
+  [']['] = { 'goto_next_end', '@class.outer' },
+  ['[m'] = { 'goto_prevoius_start', '@function.outer' },
+  ['[['] = { 'goto_previou_start', '@class.outer' },
+  ['[M'] = { 'goto_previous_end', '@function.outer' },
+  ['[]'] = { 'goto_previous_end', '@class.outer' },
+} do
+  vim.keymap.set({ 'n', 'x', 'o' }, keys, function() move[m[1]](m[2], 'textobjects') end, { desc = 'TS ' .. m[1] .. ' ' .. m[2] })
+end
+
+local swap = require 'nvim-treesitter-textobjects.swap'
+vim.keymap.set('n', '<leader>a', function() swap.swap_next '@parameter.inner' end, { desc = 'Swap with next parameter' })
+vim.keymap.set('n', '<leader>A', function() swap.swap_previous '@parameter.inner' end, { desc = 'Swap with previous parameter' })
+
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
